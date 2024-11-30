@@ -18,6 +18,15 @@ def preprocess(X):
         X[column] = le.fit_transform(X[column])
     return X
 
+def create_statistical_features(X):
+    # Criar novas features estatísticas
+    X['mean'] = X.mean(axis=1)
+    X['std'] = X.std(axis=1)
+    X['min'] = X.min(axis=1)
+    X['max'] = X.max(axis=1)
+    X['median'] = X.median(axis=1)
+    return X
+
 def preprocess_train_dataset():
     # Carregar o dataset
     df = pd.read_csv("train.csv")
@@ -29,6 +38,7 @@ def preprocess_train_dataset():
     X = df.drop(['Id', 'SalePrice'], axis=1)
 
     X = preprocess(X)
+    X = create_statistical_features(X)  # Adicionar features estatísticas
     return X, y
 
 def preprocess_test_dataset():
@@ -40,6 +50,7 @@ def preprocess_test_dataset():
     ids = df_test['Id']
 
     X = preprocess(X)
+    X = create_statistical_features(X)  # Adicionar features estatísticas
     return X, ids
 
 # Pré-processar os dados
@@ -76,7 +87,7 @@ for model_name, model in models.items():
     }
 
 # Exibir os resultados
-print("Desempenho dos modelos com validação cruzada:")
+print("Desempenho dos modelos com validação cruzada e features estatísticas:")
 for model_name, metrics in results.items():
     print(f"{model_name}:")
     print(f"  Erro Médio Absoluto (MAE): {metrics['MAE']}")
