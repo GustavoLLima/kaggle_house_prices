@@ -4,6 +4,7 @@ from sklearn.linear_model import LinearRegression
 from sklearn.svm import SVR
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
+from sklearn.model_selection import cross_val_score
 import numpy as np  # Importar numpy para calcular a raiz quadrada
 
 def preprocess(X):
@@ -53,21 +54,18 @@ models = {
     "Support Vector Regressor": SVR(kernel='linear')  # Você pode ajustar o kernel conforme necessário
 }
 
-# Avaliar cada modelo
+# Avaliar cada modelo com validação cruzada
 results = {}
 
 for model_name, model in models.items():
-    # Treinar o modelo
-    model.fit(X_train, y_train)
-
-    # Fazer previsões no conjunto de treinamento
-    y_train_pred = model.predict(X_train)
-
-    # Calcular métricas de desempenho
-    mse = mean_squared_error(y_train, y_train_pred)
-    mae = mean_absolute_error(y_train, y_train_pred)
-    r2 = r2_score(y_train, y_train_pred)
+    # Realizar validação cruzada
+    cv_scores = cross_val_score(model, X_train, y_train, cv=5, scoring='neg_mean_squared_error')
+    
+    # Calcular MSE médio e RMSE
+    mse = -cv_scores.mean()  # O cross_val_score retorna valores negativos para MSE
     rmse = np.sqrt(mse)  # Calcular RMSE
+    mae = mean_absolute_error(y_train, model.fit(X_train, y_train).predict(X_train))  # MAE no conjunto de treinamento
+    r2 = r2_score(y_train, model.fit(X_train, y_train).predict(X_train))  # R² no conjunto de treinamento
 
     # Armazenar os resultados
     results[model_name] = {
@@ -78,7 +76,7 @@ for model_name, model in models.items():
     }
 
 # Exibir os resultados
-print("Desempenho dos modelos:")
+print("Desempenho dos modelos com validação cruzada:")
 for model_name, metrics in results.items():
     print(f"{model_name}:")
     print(f"  Erro Médio Absoluto (MAE): {metrics['MAE']}")
@@ -94,6 +92,7 @@ best_model = models[best_model_name]
 print(f"O melhor modelo com base no RMSE é: {best_model_name}")
 
 # Fazer previsões no conjunto de teste com o melhor modelo
+best_model.fit(X_train, y_train)  # Treinar o melhor modelo com todos os dados de treinamento
 y_pred = best_model.predict(X_test)
 
 # Abrir um arquivo para escrita
@@ -109,4 +108,4 @@ with open('predictions.csv', 'w') as f:
 with open('predictions.csv', 'r') as f:
     line_count = sum(1 for line in f)  # Conta cada linha no arquivo
 
-print(f"O arquivo predictions.csv tem {line_count}")
+print(f"O arquivo predictions.csv tem {line_count} linhas.")
