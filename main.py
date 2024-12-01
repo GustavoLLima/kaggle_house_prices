@@ -4,7 +4,7 @@ from sklearn.linear_model import LinearRegression
 from sklearn.svm import SVR
 from sklearn.preprocessing import LabelEncoder
 from sklearn.metrics import mean_squared_error, mean_absolute_error, r2_score
-from sklearn.model_selection import cross_val_score
+from sklearn.model_selection import GridSearchCV
 import numpy as np  # Importar numpy para calcular a raiz quadrada
 
 def preprocess(X):
@@ -64,33 +64,56 @@ def evaluate_models(X, y, models):
 
     for model_name, model in models.items():
         print(f"Avaliando o modelo: {model_name}...")
-        # Realizar validação cruzada
-        cv_scores = cross_val_score(model, X, y, cv=5, scoring='neg_mean_squared_error')
-        
-        # Calcular MSE médio e RMSE
-        mse = -cv_scores.mean()  # O cross_val_score retorna valores negativos para MSE
-        rmse = np.sqrt(mse)  # Calcular RMSE
-        mae = mean_absolute_error(y, model.fit(X, y).predict(X))  # MAE no conjunto de treinamento
-        r2 = r2_score(y, model.fit(X, y).predict(X))  # R² no conjunto de treinamento
+
+        # Definir a grade de hiperparâmetros para cada modelo
+        param_grid = {
+            "Gradient Boosting": {
+                'n_estimators': [100, 200],
+                'learning_rate': [0.01, 0.1, 0.2],
+                'max_depth': [3, 5, 7]
+            },
+            "Random Forest": {
+                'n_estimators': [100, 200],
+                'max_depth': [None, 10, 20],
+                'min_samples_split': [2, 5]
+            },
+            "Linear Regression": {
+                'fit_intercept': [True, False]
+            },
+            "Support Vector Regressor": {
+                'C': [0.1, 1, 10],
+                'kernel': ['linear', 'rbf']
+            }
+        }
+
+        # Realizar GridSearchCV para encontrar os melhores hiperparâmetros
+        grid_search = GridSearchCV(model, param_grid[model_name], cv=5, scoring='neg_mean_squared_error')
+        grid_search.fit(X, y)
+
+        # Obter o melhor modelo e suas métricas
+        best_model = grid_search.best_estimator_
+        best_rmse = np.sqrt(-grid_search.best_score_)
+        best_mae = mean_absolute_error(y, best_model.predict(X))
+        best_r2 = r2_score(y, best_model.predict(X))
 
         # Armazenar os resultados
         results[model_name] = {
-            "MAE": mae,
-            "MSE": mse,
-            "RMSE": rmse,  # Adicionar RMSE aos resultados
-            "R²": r2
+            "MAE": best_mae,
+            "RMSE": best_rmse,
+            "Best Params": grid_search.best_params_,
+            "R²": best_r2
         }
-        print(f"Modelo {model_name} avaliado com sucesso.")
+        print(f"Modelo {model_name} avaliado com sucesso. Melhor RMSE: {best_rmse:.4f}")
 
     print("Avaliação dos modelos concluída.")
     return results
 
 # Definir os modelos fora da função
 models = {
-    "Gradient Boosting": GradientBoostingRegressor(n_estimators=100, random_state=42),
-    "Random Forest": RandomForestRegressor(n_estimators=100, random_state=42),
+    "Gradient Boosting": GradientBoostingRegressor(random_state=42),
+    "Random Forest": RandomForestRegressor(random_state=42),
     "Linear Regression": LinearRegression(),
-    "Support Vector Regressor": SVR(kernel='linear')  # Você pode ajustar o kernel conforme necessário
+    "Support Vector Regressor": SVR()  # Você pode ajustar o kernel conforme necessário
 }
 
 # Teste 1: Dados Crus
@@ -167,8 +190,8 @@ best_model.fit(X_train_best, y_train)
 X_test, ids = preprocess_test_dataset()
 X_test = preprocess(X_test)  # Pré-processar dados de teste
 
-# Adicionar features estatísticas se o melhor modelo for o combinado
-if best_overall_model == "Combinado":
+# Adicionar features estatísticas se o melhor modelo for o combinado ou estatísticas
+if best_overall_model == "Combinado" or best_overall_model == "Estatísticas":
     X_test = create_statistical_features(X_test)
 
 # Fazer previsões
